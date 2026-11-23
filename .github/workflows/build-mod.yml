@@ -1,19 +1,34 @@
 name: Build mod APK
 on: workflow_dispatch
+permissions:
+  contents: write
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Prepare project (game archive + mod files)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release download game-base --pattern game.zip --repo "${{ github.repository }}"
+          mkdir game
+          unzip -q game.zip -d game
+          rm game.zip
+          VER=$(find game -maxdepth 4 -name ProjectVersion.txt | head -1)
+          PROJ=$(dirname "$(dirname "$VER")")
+          echo "PROJ=$PROJ" >> "$GITHUB_ENV"
+          cp -r mod/. "$PROJ"/
       - uses: actions/cache@v4
         with:
-          path: Library
+          path: ${{ env.PROJ }}/Library
           key: Library-mod-${{ github.run_number }}
           restore-keys: Library-mod-
       - uses: game-ci/unity-builder@v4
         env:
           UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
         with:
+          projectPath: ${{ env.PROJ }}
           unityVersion: auto
           targetPlatform: Android
           buildMethod: BaldiMod.ModTools.BuildAll
